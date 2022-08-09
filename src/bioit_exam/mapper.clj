@@ -1,4 +1,5 @@
-(ns bioit-exam.mapper)
+(ns bioit-exam.mapper
+  (:require [clojure.algo.generic.functor :as f :only fmap]))
 
 (defn read-fasta [file-name])
   ; (with-open [r (BufferedReader. (FileReader.  file-name))]
@@ -10,15 +11,23 @@
   ; (read-fasta ref-file)
   ; (read-fasta sample-file)
 
-(defn get-seed [_read seed-len]
-  (take seed-len _read))
+(defn compute-kmers [ref' kmer-size]
+  (println "working hard, all day long...")
+  (->> ref'
+       (partition kmer-size 1)
+       (map-indexed (fn [i kmer] {:pos i :kmer kmer}))
+       (group-by :kmer)
+       (f/fmap (partial map :pos))))
 
-(defn get-kmer-positions [_ref kmer]
-  (let [seed-len (count kmer)])
-  [1 2 3])
+(def kmer-positions
+  (memoize compute-kmers))
 
-(defn pad-with [fill-in xs]
-  (concat xs (repeat fill-in)))
+(defn get-kmer-positions [ref' kmer]
+  (-> ref'
+      (kmer-positions (count kmer))
+      (get kmer [])))
+
+(defn pad-with [fill-in xs]  (concat xs (repeat fill-in)))
 
 (defn count-mismatches [ref' read' offset]
   (->> ref'
@@ -29,23 +38,12 @@
        (filter false?)
        (count)))
 
-(count-mismatches "agtc" "gtac" 1)
+(defn map-reads [kmer-size max-mismatches ref' reads]
+  (let [mismatches-tolerated? #(>= max-mismatches (count-mismatches ref' %1 %2))
+        matching-positions #(->> (take kmer-size %)
+                                 (get-kmer-positions ref')
+                                 (filter (partial mismatches-tolerated? %)))]
+    (zipmap reads (map matching-positions reads))))
 
-(defn with-valid-positions [kmer-size max-mismatches _ref _read]
-  (let [mismatches-tolerated?
-        (fn [pos] (>= max-mismatches (count-mismatches _ref _read pos)))]
-    (->> _read
-         (get-seed kmer-size)
-         (get-kmer-positions _ref)
-         (filter mismatches-tolerated?)
-         (reduce conj [])
-         (conj [_read]))))
-
-(defn map-reads [kmer-size max-mismatches _ref reads]
-  (let [with-valid-positions (partial with-valid-positions kmer-size max-mismatches _ref)]
-    (->> reads
-         (map with-valid-positions)
-         (into {}))))
-
-(map-reads 23 2 "agtc" ["ag" "gt" "tc"])
+(map-reads 2 2 "cagtcag" ["ag" "gtc" "cag" "aaa"])
 
