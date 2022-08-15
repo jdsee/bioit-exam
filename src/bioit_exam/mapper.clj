@@ -1,8 +1,6 @@
 (ns bioit-exam.mapper
-  (:require
-   [bioit-exam.polisher :refer :all]
-   [clojure.algo.generic.functor :as f :only fmap]
-   [clojure.string :as str]))
+  (:require [bioit-exam.polisher :refer :all]
+            [clojure.algo.generic.functor :as f :only fmap]))
 
 (defn compute-kmers [ref' kmerlen]
   (->> ref'
