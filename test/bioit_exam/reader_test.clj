@@ -1,4 +1,4 @@
-(ns bioit-exam.io-test
+(ns bioit-exam.reader-test
   (:require [clojure.test :refer [deftest testing is]]
             [bioit-exam.io :refer :all]))
 

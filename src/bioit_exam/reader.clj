@@ -1,13 +1,13 @@
-(ns bioit-exam.io
+(ns bioit-exam.reader
   (:require [clojure.java.io :as io]
             [clojure.string :as str]))
 
 (defn parse-fasta-line [reads line]
-  (let [last-index (comp dec count)
+  (let [last-index (-> reads count dec)
         trimmed (str/trim line)]
     (if (= \> (first trimmed))
       (conj reads {:header line :lines []})
-      (update-in reads [(last-index reads) :lines] #(conj %1 trimmed)))))
+      (update-in reads [last-index :lines] #(conj %1 trimmed)))))
 
 (defn parse-fasta [lines]
   (reduce parse-fasta-line [] lines))
