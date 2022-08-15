@@ -1,20 +1,12 @@
 (ns bioit-exam.mapper
-  (:require [clojure.algo.generic.functor :as f :only fmap]))
+  (:require
+   [bioit-exam.polisher :refer :all]
+   [clojure.algo.generic.functor :as f :only fmap]
+   [clojure.string :as str]))
 
-(defn read-fasta [file-name])
-  ; (with-open [r (BufferedReader. (FileReader.  file-name))]
-  ; (.read )))
-
-; (defn map-from-file [ref-file sample-file]
-;   (let [reference (read-fasta ref-file)
-;         reads (read-fasta sample-file)])
-  ; (read-fasta ref-file)
-  ; (read-fasta sample-file)
-
-(defn compute-kmers [ref' kmer-size]
-  (println "working hard, all day long...")
+(defn compute-kmers [ref' kmerlen]
   (->> ref'
-       (partition kmer-size 1)
+       (partition kmerlen 1)
        (map-indexed (fn [i kmer] {:pos i :kmer kmer}))
        (group-by :kmer)
        (f/fmap (partial map :pos))))
@@ -29,21 +21,23 @@
 
 (defn pad-with [fill-in xs]  (concat xs (repeat fill-in)))
 
-(defn count-mismatches [ref' read' offset]
+(defn count-mismatches [ref' read' pos]
   (->> ref'
-       (drop offset)
+       (drop pos)
        (take (count read'))
        (pad-with nil)
        (map = read')
        (filter false?)
        (count)))
 
-(defn map-reads [kmer-size max-mismatches ref' reads]
-  (let [mismatches-tolerated? #(>= max-mismatches (count-mismatches ref' %1 %2))
-        matching-positions #(->> (take kmer-size %)
-                                 (get-kmer-positions ref')
-                                 (filter (partial mismatches-tolerated? %)))]
-    (zipmap reads (map matching-positions reads))))
+(defn matching-positions [kmerlen max-mismatches ref' read']
+  (->> read'
+       (take kmerlen)
+       (get-kmer-positions ref')
+       (filter #(>= max-mismatches (count-mismatches ref' read' %)))))
 
-(map-reads 2 2 "cagtcag" ["ag" "gtc" "cag" "aaa"])
+(defn map-reads [kmerlen max-mismatches ref' reads]
+  (->> reads
+       (map (partial matching-positions kmerlen max-mismatches ref'))
+       (zipmap reads)))
 
