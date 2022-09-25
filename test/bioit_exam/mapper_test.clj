@@ -23,6 +23,6 @@
 
   (testing "should not map reads when they exceed the maximum of mismatches"
     (let [ref' "CTGACTG"
-          reads ["TGAXTX"]
+          reads ["TXAXTX"]
           mappings (map-reads 3 3 ref' reads)]
-      (is (= mappings {1 ["TGAXTX"]})))))
+      (is (= mappings {})))))
