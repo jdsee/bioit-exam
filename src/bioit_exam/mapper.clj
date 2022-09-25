@@ -3,22 +3,22 @@
             [clojure.spec.alpha :as s]))
 
 (defn compute-kmers
-  "Finds all unique kmers with length k and
-  maps them to matching postions in ref-seq."
-  [ref-seq k]
-  (->> ref-seq
+  "Returns all unique kmers with length k mapped to the
+  starting postions at which they occur in refseq."
+  [refseq k]
+  (->> refseq
        (partition k 1)
        (map-indexed (fn [i kmer] {:pos i :kmer kmer}))
        (group-by :kmer)
        (f/fmap (partial map :pos))))
 
-(def kmer-positions
-  (memoize compute-kmers))
+(def kmer-positions (memoize compute-kmers))
 
-(defn get-kmer-positions [ref-seq seed]
-  (-> ref-seq
-      (kmer-positions (count seed))
-      (get seed [])))
+(defn get-kmer-positions
+  "Return the positions at which kmer occurs in refseq"
+  [refseq kmer]
+  (-> (kmer-positions refseq (count kmer))
+      (get kmer [])))
 
 (defn pad-with [fill-in coll]
   (concat coll (repeat fill-in)))
@@ -30,34 +30,32 @@
        (count)))
 
 (defn tolerated?
-  "Return true if read-seq has max-div mismatches at max when
-  comparing to ref-seq at position pos."
-  [ref-seq read-seq pos max-div]
-  (->> (drop pos ref-seq)
-       (take (count read-seq))
-       (diff-count read-seq)
+  "Return true if readseq has max-div mismatches at most when
+  comparing to refseq at position i."
+  [refseq readseq i max-div]
+  (->> (subvec refseq i (count readseq))
+       (diff-count readseq)
        #(> % max-div)))
 
 (defn matching-positions
-  "Find all positions in the given ref-seq at which kmers of
-  length k match kmers in read-seq with tolerance of max-div
+  "Find all positions in the given refseq at which kmers of
+  length k match kmers in readseq with tolerance of max-div
   mismatches."
-  [k max-div ref-seq read-seq]
-  (->> (take k read-seq)
-       (get-kmer-positions ref-seq)
-       (filter #(tolerated? ref-seq read-seq max-div %))))
+  [k max-div refseq readseq]
+  (->> (take k readseq)
+       (get-kmer-positions refseq)
+       (filter #(tolerated? refseq readseq max-div %))))
 
-(defn group-by-pos [k max-div ref-seq]
-  (fn [mapping read-seq]
-    (->> (matching-positions k max-div ref-seq read-seq)
-         (reduce #(update %1 %2 concat [read-seq]) mapping))))
-         ; (map #(update mapping % concat [read-seq])))))
+(defn group-by-pos [k max-div refseq]
+  (fn [mapping readseq]
+    (->> (matching-positions k max-div refseq readseq)
+         (reduce #(update %1 %2 concat [readseq]) mapping))))
 
 (defn map-reads
-  "Maps all reads to ref-seq and returns a map of indices to the
-  reads with potential match to ref-seq at that index."
-  [k max-div ref-seq reads]
-  (reduce (group-by-pos k max-div ref-seq) {} reads))
+  "Maps all reads to refseq and returns a map of indices to the
+  reads with a match to refseq at that index."
+  [k max-div refseq reads]
+  (reduce (group-by-pos k max-div refseq) {} reads))
 
 ;; Following is not needed
 ;; just experimenting a bit
@@ -65,15 +63,15 @@
 (s/fdef map-reads
   :args (s/cat :k pos-int?
                :max-div nat-int?
-               :ref-seq string?
+               :refseq string?
                :reads (s/coll-of string?))
   :ret (s/map-of int? string?))
 
 (s/fdef matching-positions
   :args (s/cat :k pos-int?
                :max-div nat-int?
-               :ref-seq string?
-               :read-seq string?)
+               :refseq string?
+               :readseq string?)
   :ret (s/coll-of nat-int?)
   :fn (s/and (s/coll-of nat-int?)
-             (fn [x] (every? #(< % (count (-> x :args :ref-seq))) (:ret x)))))
+             (fn [x] (every? #(< % (count (-> x :args :refseq))) (:ret x)))))
