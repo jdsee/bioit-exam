@@ -1,5 +1,6 @@
 (ns bioit-exam.mapper
   (:require [clojure.algo.generic.functor :as f :only fmap]
+            [clojure.core.memoize :as m :only memo]
             [clojure.spec.alpha :as s]))
 
 (defn compute-kmers
@@ -12,7 +13,7 @@
        (group-by :kmer)
        (f/fmap (partial map :pos))))
 
-(def kmer-positions (memoize compute-kmers))
+(def kmer-positions (m/memo compute-kmers))
 
 (defn get-kmer-positions
   "Return the positions at which kmer occurs in refseq"
