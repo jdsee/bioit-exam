@@ -1,7 +1,8 @@
 (ns bioit-exam.mapper
   (:require [clojure.algo.generic.functor :as f :only fmap]
-            [clojure.core.memoize :as m :only memo]
-            [clojure.spec.alpha :as s]))
+            [clojure.core.memoize :as memo :only memo]
+            [clojure.spec.alpha :as s]
+            [clojure.spec.test.alpha :as stest]))
 
 (defn compute-kmers
   "Returns all unique kmers with length k mapped to the
@@ -13,10 +14,10 @@
        (group-by :kmer)
        (f/fmap (partial map :pos))))
 
-(def kmer-positions (m/memo compute-kmers))
+(def kmer-positions (memo/memo compute-kmers))
 
 (defn get-kmer-positions
-  "Return the positions at which kmer occurs in refseq"
+  "Returns the positions at which kmer occurs in refseq"
   [refseq kmer]
   (-> (kmer-positions refseq (count kmer))
       (get kmer [])))
@@ -25,23 +26,26 @@
   (concat coll (repeat fill-in)))
 
 (defn diff-count [coll other]
-  (->> (pad-with nil coll)
-       (map = (pad-with nil other))
+  (->> (pad-with nil other)
+       (map = coll)
        (filter false?)
        (count)))
 
 (defn tolerated?
-  "Return true if readseq has max-div mismatches at most when
+  "Returns true if readseq has max-div mismatches at most when
   comparing to refseq at position i."
   [refseq readseq i max-div]
-  (->> (subvec refseq i (count readseq))
+  (->> (+ i (count readseq))
+       (subs refseq i)
        (diff-count readseq)
-       #(> % max-div)))
+       (#(<= % max-div))))
 
 (defn matching-positions
   "Find all positions in the given refseq at which kmers of
   length k match kmers in readseq with tolerance of max-div
-  mismatches."
+  mismatches.
+  Be aware that the seed of length k has to match exactly on
+  any kmer in readseq, otherwise the whole read is ignored."
   [k max-div refseq readseq]
   (->> (take k readseq)
        (get-kmer-positions refseq)
@@ -61,12 +65,17 @@
 ;; Following is not needed
 ;; just experimenting a bit
 
+(defn all-caps? [string]
+  (every? #(Character/isUpperCase %) string))
+
+(s/def :gen/base (s/and string? all-caps?))
+
 (s/fdef map-reads
   :args (s/cat :k pos-int?
                :max-div nat-int?
-               :refseq string?
-               :reads (s/coll-of string?))
-  :ret (s/map-of int? string?))
+               :refseq :gen/base
+               :reads (s/coll-of :gen/base)
+  :ret (s/map-of int? string?)))
 
 (s/fdef matching-positions
   :args (s/cat :k pos-int?
