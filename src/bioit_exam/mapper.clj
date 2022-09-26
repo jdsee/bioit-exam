@@ -38,7 +38,7 @@
   (->> (+ i (count readseq))
        (subs refseq i)
        (diff-count readseq)
-       (#(<= % max-div))))
+       (>= max-div)))
 
 (defn matching-positions
   "Find all positions in the given refseq at which kmers of
