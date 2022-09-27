@@ -1,6 +1,7 @@
 (ns bioit-exam.mapper
   (:require [clojure.algo.generic.functor :as f :only fmap]
             [clojure.core.memoize :as memo :only memo]
+            [clojure.core.reducers :as r]
             [clojure.spec.alpha :as s]
             [clojure.spec.test.alpha :as stest]))
 
@@ -34,9 +35,10 @@
 (defn tolerated?
   "Returns true if readseq has max-div mismatches at most when
   comparing to refseq at position i."
-  [refseq readseq i max-div]
+  [refseq readseq max-div i]
   (->> (+ i (count readseq))
-       (subs refseq i)
+       (min (- (count refseq) 1))
+       (subvec refseq i)
        (diff-count readseq)
        (>= max-div)))
 
@@ -47,20 +49,38 @@
   Be aware that the seed of length k has to match exactly on
   any kmer in readseq, otherwise the whole read is ignored."
   [k max-div refseq readseq]
-  (->> (take k readseq)
+  (->> (take k readseq) ; TODO - is subvec better here?
        (get-kmer-positions refseq)
-       (filter #(tolerated? refseq readseq max-div %))))
+       (r/filter #(tolerated? refseq readseq max-div %))))
 
-(defn group-by-pos [k max-div refseq]
+(defn- group-by-pos [positions]
+  (fn [mapping readseq]
+    (r/reduce #(update %1 %2 conj readseq)
+              mapping
+              (positions readseq))))
+
+(defn concat-merge
+  ([] {})
+  ([coll other] (merge-with concat coll other)))
+
+(defn map-reads
+  "Maps all reads to refseq and returns a collection of indices
+  mapped to the reads matching at that index in refseq."
+  [k max-div refseq reads]
+  (let [refvec (vec refseq)
+        positions #(matching-positions k max-div refvec %)]
+    (r/fold concat-merge (group-by-pos positions) reads)))
+
+(defn group-by-pos' [k max-div refseq]
   (fn [mapping readseq]
     (->> (matching-positions k max-div refseq readseq)
          (reduce #(update %1 %2 concat [readseq]) mapping))))
 
-(defn map-reads
+(defn map-reads'
   "Maps all reads to refseq and returns a map of indices to the
   reads with a match to refseq at that index."
   [k max-div refseq reads]
-  (reduce (group-by-pos k max-div refseq) {} reads))
+  (reduce (group-by-pos' k max-div refseq) {} reads))
 
 ;; Following is not needed
 ;; just experimenting a bit
@@ -75,7 +95,7 @@
                :max-div nat-int?
                :refseq :gen/base
                :reads (s/coll-of :gen/base)
-  :ret (s/map-of int? string?)))
+               :ret (s/map-of int? string?)))
 
 (s/fdef matching-positions
   :args (s/cat :k pos-int?
