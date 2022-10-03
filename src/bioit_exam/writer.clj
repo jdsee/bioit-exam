@@ -6,11 +6,6 @@
    [clojure.spec.test.alpha :as stest]
    [clojure.string :as str]))
 
-(def mapping
-  {:ref {:seq [\T \C \A \G \T \G \G \T \C \C \G \T] , :name "REF001"}
-   :mapped-reads {5 (list "GGTATG")
-              2 (list "AGTAAT" "AGTAATCCGTAG")}})
-
 (defn- base-repr [refbase base]
   (if (= base refbase) \. base))
 
@@ -46,18 +41,12 @@
         (recur stash accum next-pos)
         accum))))
 
-(make-pileup mapping)
+(defn pileup-lines
+  [pileup]
+  (map #(str/join \tab (vals %)) pileup))
 
-(s/fdef make-pileup
-  :args :core/mapping
-  :ret boolean?)
-
-(defn write-pileup [filename pileup]
+(defn write-pileup [filename pileup-lines]
   (with-open [w (io/writer filename)]
-    (for [p pileup
-          :let [line (str/join \tab p)]]
-      (.write w line))))
-
-(str/join \tab "HALLO")
-
-(stest/instrument `make-pileup)
+    (doseq [line pileup-lines]
+      (.write w line)
+      (.newLine w))))
