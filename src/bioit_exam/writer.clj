@@ -20,8 +20,8 @@
 (defn- line-partitioner [refbase]
   (fn [[result remainder] [base & tail]]
     [(str result (base-repr refbase base))
-     (if-some [x tail]
-       (conj remainder x)
+     (if (some? tail)
+       (conj remainder tail)
        remainder)]))
 
 (defn- pileup-bases
