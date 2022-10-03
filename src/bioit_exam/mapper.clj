@@ -34,25 +34,25 @@
        (count)))
 
 (defn tolerated?
-  "Returns true if readseq has max-div mismatches at most when
+  "Returns true if readseq has max-miss mismatches at most when
   comparing to refseq at position i."
-  [refseq readseq max-div i]
+  [refseq readseq max-miss i]
   (->> (+ i (count readseq))
        (min (dec (count refseq)))
        (subvec refseq i)
        (diff-count readseq)
-       (>= max-div)))
+       (>= max-miss)))
 
 (defn matching-positions
   "Find all positions in the given refseq at which kmers of
-  length k match kmers in readseq with tolerance of max-div
+  length k match kmers in readseq with tolerance of max-miss
   mismatches.
   Be aware that the seed of length k has to match exactly on
   any kmer in readseq, otherwise the whole read is ignored."
-  [k max-div refseq readseq]
+  [k max-miss refseq readseq]
   (->> (take k readseq)
        (get-kmer-positions refseq)
-       (r/filter #(tolerated? refseq readseq max-div %))))
+       (r/filter #(tolerated? refseq readseq max-miss %))))
 
 (defn- group-by-pos [positions]
   (fn [mapping readseq]
@@ -67,25 +67,28 @@
 (defn map-reads
   "Maps all reads to refseq and returns a map of indices to the
   reads with a match to refseq at that index."
-  [k max-div {refseq :seq :as reference} reads]
-  (let [positions #(matching-positions k max-div refseq %)
-        result (r/fold concat-merge (group-by-pos positions) reads)]
-    {:reference reference
-     :mapped-reads result}))
+  [k max-miss {refseq :seq refname :name} reads]
+  (let [refvec (vec refseq)
+        readseqs (map :seq reads)
+        positions #(matching-positions k max-miss refvec %)]
+    {:reference {:name refname, :seq refvec}
+     :mapped-reads (r/fold concat-merge
+                           (group-by-pos positions)
+                           readseqs)}))
 
 ;; Following is not needed
 ;; just experimenting a bit
 
 (s/fdef map-reads
   :args (s/cat :k pos-int?
-               :max-div nat-int?
+               :max-miss nat-int?
                :refseq :domain/reference
                :reads (s/coll-of :gen/base))
   :ret :domain/mapping)
 
 (s/fdef matching-positions
   :args (s/cat :k pos-int?
-               :max-div nat-int?
+               :max-miss nat-int?
                :refseq :domain/reference
                :readseq :domain/read)
   :ret (s/coll-of nat-int?)

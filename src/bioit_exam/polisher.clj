@@ -1,14 +1,14 @@
 (ns bioit-exam.polisher
   (:require [clojure.algo.generic.functor :as f]))
 
-(defn slice-kmers [kmerlen read']
+(defn slice-kmers [k read']
   (->> read'
-       (partition kmerlen 1)
+       (partition k 1)
        (map (fn [kmer] {:kmer kmer :read read'}))))
 
-(defn build-spectrum [kmerlen reads]
+(defn build-spectrum [k reads]
   (->> reads
-       (mapcat (partial slice-kmers kmerlen))
+       (mapcat (partial slice-kmers k))
        (group-by :kmer)
        (f/fmap #(let [reads (map :read %)]
                   {:reads (distinct reads)
@@ -32,11 +32,16 @@
 (defn best-candidate [replace-freqs candidates]
   (apply max-key replace-freqs candidates))
 
-(defn choose-candidates [min-freq spectrum candidates]
+(defn choose-candidates [min-freq spectrum]
   (let [replace-freqs #(get-in spectrum [(:replacement %) :freq] 0)]
-    (->> candidates
+    (->> (candidates min-freq spectrum)
          (group-by :kmer)
          (vals)
          (map (partial best-candidate replace-freqs))
          (filter #(>= (replace-freqs %) min-freq)))))
+
+(defn polish-all
+  [k min-freq reads]
+  (->> (build-spectrum k reads)
+       (choose-candidates min-freq)))
 

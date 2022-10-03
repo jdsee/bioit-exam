@@ -1,7 +1,6 @@
 (ns bioit-exam.writer
   (:require
    [clojure.java.io :as io]
-   [clojure.pprint :refer :all]
    [clojure.string :as str]))
 
 (defn- make-line
@@ -21,13 +20,13 @@
    coll))
 
 (defn- pileup-bases
-  [{:keys [mapped-reads] {refseq :seq} :ref} stash i]
+  [{:keys [mapped-reads] {refseq :seq} :reference} stash i]
   (->> (mapped-reads i)
        (concat stash)
        (chop-matching-bases (get refseq i))))
 
 (defn make-pileup
-  [{{refseq :seq :as reference} :ref :as mapping}]
+  [{{refseq :seq :as reference} :reference :as mapping}]
   (loop [stash [], accum [], i 0]
     (let [[bases stash] (pileup-bases mapping stash i)
           next-pos (inc i)
@@ -40,8 +39,21 @@
   [pileup]
   (map #(str/join \tab (vals %)) pileup))
 
+(defn as-pileup
+  [mapping]
+  (-> mapping make-pileup pileup-lines))
+
 (defn write-pileup! [filename pileup-lines]
   (with-open [w (io/writer filename)]
     (doseq [line pileup-lines]
       (.write w line)
       (.newLine w))))
+
+; (def mapping
+;   {:reference {:seq [\T \C \A \G \T \G \G \T \C \C \G \T] , :name "REF001"}
+;    :mapped-reads {5 (list "GGTATG")
+;                   2 (list "AGTAAT" "AGTAATCCGTAG")}})
+
+; (->> (make-pileup mapping)
+;      (pileup-lines)
+;      (write-pileup! "test_pileup"))
