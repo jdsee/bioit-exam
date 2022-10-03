@@ -1,5 +1,6 @@
 (ns bioit-exam.mapper
-  (:require [clojure.algo.generic.functor :as f :only fmap]
+  (:require [bioit-exam.spec :as domain]
+            [clojure.algo.generic.functor :as f :only fmap]
             [clojure.core.memoize :as memo :only memo]
             [clojure.core.reducers :as r]
             [clojure.spec.alpha :as s]
@@ -20,8 +21,8 @@
 (defn get-kmer-positions
   "Returns the positions at which kmer occurs in refseq"
   [refseq kmer]
-  (-> (kmer-positions refseq (count kmer))
-      (get kmer [])))
+  (let [positions (kmer-positions refseq (count kmer))]
+    (get positions kmer)))
 
 (defn pad-with [fill-in coll]
   (concat coll (repeat fill-in)))
@@ -37,7 +38,7 @@
   comparing to refseq at position i."
   [refseq readseq max-div i]
   (->> (+ i (count readseq))
-       (min (- (count refseq) 1))
+       (min (dec (count refseq)))
        (subvec refseq i)
        (diff-count readseq)
        (>= max-div)))
@@ -49,7 +50,7 @@
   Be aware that the seed of length k has to match exactly on
   any kmer in readseq, otherwise the whole read is ignored."
   [k max-div refseq readseq]
-  (->> (take k readseq) ; TODO - is subvec better here?
+  (->> (take k readseq)
        (get-kmer-positions refseq)
        (r/filter #(tolerated? refseq readseq max-div %))))
 
