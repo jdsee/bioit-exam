@@ -6,4 +6,7 @@
   :dependencies [[org.clojure/algo.generic "0.1.3"]
                  [org.clojure/clojure "1.11.1"]
                  [org.clojure/core.memoize "1.0.257"]]
+
+  :profiles {:dev {:dependencies [[org.clojure/test.check "0.10.0"]]}}
+
   :repl-options {:init-ns bioit-exam.core})

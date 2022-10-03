@@ -65,44 +65,46 @@
   ([coll other] (merge-with concat coll other)))
 
 (defn map-reads
-  "Maps all reads to refseq and returns a collection of indices
-  mapped to the reads matching at that index in refseq."
-  [k max-div refseq reads]
-  (let [refvec (vec refseq)
-        positions #(matching-positions k max-div refvec %)]
-    (r/fold concat-merge (group-by-pos positions) reads)))
-
-(defn group-by-pos' [k max-div refseq]
-  (fn [mapping readseq]
-    (->> (matching-positions k max-div refseq readseq)
-         (reduce #(update %1 %2 concat [readseq]) mapping))))
-
-(defn map-reads'
   "Maps all reads to refseq and returns a map of indices to the
   reads with a match to refseq at that index."
-  [k max-div refseq reads]
-  (reduce (group-by-pos' k max-div refseq) {} reads))
+  [k max-div {refseq :seq :as reference} reads]
+  (let [positions #(matching-positions k max-div refseq %)
+        result (r/fold concat-merge (group-by-pos positions) reads)]
+    {:reference reference
+     :mapped-reads result}))
 
 ;; Following is not needed
 ;; just experimenting a bit
 
-(defn all-caps? [string]
-  (every? #(Character/isUpperCase %) string))
-
-(s/def :gen/base (s/and string? all-caps?))
-
 (s/fdef map-reads
   :args (s/cat :k pos-int?
                :max-div nat-int?
-               :refseq :gen/base
-               :reads (s/coll-of :gen/base)
-               :ret (s/map-of int? string?)))
+               :refseq :domain/reference
+               :reads (s/coll-of :gen/base))
+  :ret :domain/mapping)
 
 (s/fdef matching-positions
   :args (s/cat :k pos-int?
                :max-div nat-int?
-               :refseq string?
-               :readseq string?)
+               :refseq :domain/reference
+               :readseq :domain/read)
   :ret (s/coll-of nat-int?)
   :fn (s/and (s/coll-of nat-int?)
              (fn [x] (every? #(< % (count (-> x :args :refseq))) (:ret x)))))
+
+;; PLAYGROUND
+
+(stest/instrument `map-reads)
+; (stest/instrument `matching-positions)
+
+;; NOTE: tolerance relates to the whole read, not to the kmer!
+
+(def reference
+  {:name "REF001"
+   :seq [\X \Y \Z \A \B \C \D \F \F \F \G \A \B \C \D \E \F \D \E \F \F]})
+;                  ^  ^  ^  ^  x  x  x              ^  ^  ^  x  ^
+;                                          ^  ^  ^  ^  ^  x  ^
+
+(map-reads 3 1 reference ["ABCDEED" "DEFFE" "GDFE"])
+
+(matching-positions 4 1 "ABCDEFG" "ABCDDEFG")
