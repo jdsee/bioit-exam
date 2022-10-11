@@ -3,7 +3,7 @@
    [clojure.algo.generic.functor :as f]
    [clojure.string :as str]))
 
-(defn- slice-kmers
+(defn- read->kmers
   [k i readseq]
   (->> readseq
        (partition k 1)
@@ -12,7 +12,7 @@
 (defn build-spectrum
   [k reads]
   (->> reads
-       (map-indexed #(slice-kmers k %1 %2))
+       (map-indexed #(read->kmers k %1 %2))
        (flatten)
        (apply merge-with concat)
        (f/fmap #(hash-map :indices (distinct %)
@@ -35,7 +35,7 @@
                     (>= altfreq min-freq))]
     {:kmer kmer
      :alt alt
-     :freq (get-in spectrum [alt :freq] 0)
+     :freq altfreq
      :indices indices}))
 
 (defn- find-alternatives
@@ -43,9 +43,7 @@
   (->> (candidates min-freq spectrum)
        (group-by :kmer)
        (vals)
-       (map #(apply max-key :freq %))
-       ; (filter #(get-in spectrum [(:alt %) :freq]))
-       ))
+       (map #(apply max-key :freq %))))
 
 (defn fix-reads
   [reads {:keys [kmer alt indices]}]
@@ -62,10 +60,3 @@
     (->> (build-spectrum k readseqs)
          (find-alternatives min-freq)
          (reduce fix-reads reads))))
-
-(comment
-  (polish 3 2 [{:seq "AGGTC"} {:seq "GTCTTGA"} {:seq "AAGGCTGTC"}])
-  (def spectrum (build-spectrum 3 ["AGGTC" "GTCTTGA" "AAGGCTGTC"]))
-  (def cs (candidates 2 spectrum))
-  (apply max-key :freq cs)
-  (find-alternatives 2 spectrum))
